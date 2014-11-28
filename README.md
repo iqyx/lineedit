@@ -9,16 +9,16 @@ embedded platform and its features and code are optimized for embedded environme
 Features
 --------------------------------------
 
-Main implemented features are:
+Version 0.1.0 implemented features:
 
 * ANSI escape sequence support (basic input parsing and output formatting)
 * single-line editing capabilities (cursor keys, backspace, del)
 * preparation for more complex shell implementations with autocompletion
 * customizable command prompt
+* history saving and recall
 
 TODO:
 
-* support for history recall
 * API cleanup
 * get rid of string manipulation functions
 
