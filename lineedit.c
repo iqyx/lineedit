@@ -306,8 +306,8 @@ int32_t lineedit_insert_char(struct lineedit *le, int c) {
 	/* now we need to refresh rest of the line */
 	i = le->cursor;
 	while (le->text[i]) {
-		char line[2] = {(le->pwchar != 0) ? le->pwchar : le->text[i], '\0'};
-		le->print_handler(line, le->print_handler_ctx);
+		char s[2] = {(le->pwchar != 0) ? le->pwchar : le->text[i], '\0'};
+		le->print_handler(s, le->print_handler_ctx);
 		i++;
 	}
 
@@ -359,10 +359,12 @@ int32_t lineedit_refresh(struct lineedit *le) {
 	lineedit_escape_print(le, ESC_ERASE_LINE_END, 0);
 
 	if (le->prompt_callback != NULL) {
-		le->prompt_len = le->prompt_callback(le, le->prompt_callback_ctx);
-		/* negative number returned, error occured */
-		if (le->prompt_len < 0) {
+		int32_t len = le->prompt_callback(le, le->prompt_callback_ctx);
+		if (len < 0) {
+			/* negative number returned, error occured */
 			le->prompt_len = 0;
+		} else {
+			le->prompt_len = (uint32_t)len;
 		}
 	}
 

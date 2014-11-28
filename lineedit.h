@@ -26,7 +26,6 @@
 #ifndef _LINEEDIT_H_
 #define _LINEEDIT_H_
 
-
 /**
  * Custom assert definition. In an embedded environment, it can be made void or
  * modified according to custom needs.
