@@ -35,6 +35,11 @@
 #endif
 
 
+#ifndef LINEEDIT_HISTORY_LEN
+#define LINEEDIT_HISTORY_LEN 5
+#endif
+
+
 /**
  * Foreground color parameter definitions used as arguments to
  * @a lineedit_escape_print function.
@@ -116,6 +121,15 @@ struct lineedit {
 	int32_t (*prompt_callback)(struct lineedit *le, void *ctx);
 	void *prompt_callback_ctx;
 	uint32_t prompt_len;
+
+	/**
+	 * History is saved in a single string split into individual history
+	 * entries. Each entry is @a len characters long. Empty history strings
+	 * are not considered valid (they are skipped).
+	 */
+	char *history;
+	uint32_t history_size;
+	int32_t recall_index;
 };
 
 
@@ -145,6 +159,43 @@ int32_t lineedit_init(struct lineedit *le, uint32_t line_len);
 int32_t lineedit_free(struct lineedit *le);
 #define LINEEDIT_FREE_OK 0
 #define LINEEDIT_FREE_FAILED -1
+
+/**
+ * @brief Append new string to history.
+ *
+ * Function shifts the whole history by one line and copies new history entry
+ * to the first position.
+ *
+ * @param le Lineedit context to save history line to. Cannot be NULL.
+ * @param line New line to be appended. Cannot be NULL.
+ *
+ * @return LINEEDIT_HISTORY_APPEND_OK on success or
+ *         LINEEDIT_HISTORY_APPEND_FAILED otherwise.
+ */
+int32_t lineedit_history_append(struct lineedit *le, const char *line);
+#define LINEEDIT_HISTORY_APPEND_OK 0
+#define LINEEDIT_HISTORY_APPEND_FAILED -1
+
+
+/**
+ * @brief Recall a previously saved history entry.
+ *
+ * Function returns a pointer to string rpeviously saved with lineedit_history_append.
+ * If a current line is requested, empty string is returned (it is not par of
+ * the history).
+ *
+ * @param le Lineedit context to recall a line from. Cannot be NULL.
+ * @param line Pointer to string containing the returned line. Cannot be NULL.
+ * @param recall_index Index of history entry to recall. Return empty line
+ *                     (currently edited line) for -1. Must be smaller than
+ *                     allocated history size.
+ *
+ * @return LINEEDIT_HISTORY_RECALL_OK on success or
+ *         LINEEDIT_HISTORY_RECALL_FAILED otherwise (parameters invalid).
+ */
+int32_t lineedit_history_recall(struct lineedit *le, char **line, int32_t recall_index);
+#define LINEEDIT_HISTORY_RECALL_OK 0
+#define LINEEDIT_HISTORY_RECALL_FAILED -1
 
 int32_t lineedit_keypress(struct lineedit *le, int c);
 #define LINEEDIT_OK 0

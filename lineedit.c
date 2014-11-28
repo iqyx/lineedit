@@ -87,12 +87,24 @@ int32_t lineedit_init(struct lineedit *le, uint32_t line_len) {
 		return LINEEDIT_INIT_FAILED;
 	}
 
-	le->text = malloc(line_len);
+	le->len = line_len;
+	le->history_size = LINEEDIT_HISTORY_LEN;
+
+	le->text = malloc(le->len);
 	if (le->text == NULL) {
 		return LINEEDIT_INIT_FAILED;
 	}
 
-	le->len = line_len;
+	le->history = malloc(le->len * le->history_size);
+	if (le->history == NULL) {
+		return LINEEDIT_INIT_FAILED;
+	}
+
+	/* Initialize history with empty strings */
+	for (uint32_t i = 0; i < le->history_size; i++) {
+		strcpy(le->history + (i * le->len), "");
+	}
+
 	le->cursor = 0;
 	le->text[0] = 0;
 	le->pwchar = '\0';
@@ -101,6 +113,7 @@ int32_t lineedit_init(struct lineedit *le, uint32_t line_len) {
 	le->print_handler = NULL;
 	le->print_handler_ctx = NULL;
 	le->prompt_callback = NULL;
+	le->recall_index = -1;
 
 	return LINEEDIT_INIT_OK;
 }
@@ -112,9 +125,43 @@ int32_t lineedit_free(struct lineedit *le) {
 		return LINEEDIT_FREE_FAILED;
 	}
 
+	free(le->history);
 	free(le->text);
 
 	return LINEEDIT_FREE_OK;
+}
+
+
+int32_t lineedit_history_append(struct lineedit *le, const char *line) {
+	if (u_assert(le != NULL) ||
+	    u_assert(line != NULL)) {
+		return LINEEDIT_HISTORY_APPEND_OK;
+	}
+
+	/* Shift all history entries first. The newest one has index 0. */
+	for (uint32_t i = le->history_size - 1; i > 0 ; i--) {
+		strncpy(le->history + (i * le->len), le->history + ((i - 1) * le->len), le->len);
+		le->history[i * le->len + le->len - 1] = '\0';
+	}
+	strncpy(le->history, line, le->len);
+	le->history[le->len - 1] = '\0';
+
+	return LINEEDIT_HISTORY_APPEND_OK;
+}
+
+
+int32_t lineedit_history_recall(struct lineedit *le, char **line, int32_t recall_index) {
+
+	if ((recall_index >= (int32_t)le->history_size) || (recall_index < -1)) {
+		return LINEEDIT_HISTORY_RECALL_FAILED;
+	}
+
+	if (recall_index == -1) {
+		*line = "";
+	} else {
+		*line = le->history + (recall_index * le->len);
+	}
+	return LINEEDIT_HISTORY_RECALL_OK;
 }
 
 
@@ -131,6 +178,12 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 
 	/* check for line feed */
 	if (c == 0x0a || c == 0x0b || c == 0x0c || c == 0x0d) {
+		/* save current line to history */
+		lineedit_history_append(le, le->text);
+
+		/* And reset recall index to point to current line (-1) */
+		le->recall_index = -1;
+
 		return LINEEDIT_ENTER;
 	}
 
@@ -184,11 +237,22 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 
 		if (c == 'A') {
 			/* Move cursor up (previous history entry). */
-			/* TODO: */
+			char *hist_command;
+			if (lineedit_history_recall(le, &hist_command, le->recall_index + 1) == LINEEDIT_HISTORY_RECALL_OK) {
+				lineedit_set_line(le, hist_command);
+				lineedit_refresh(le);
+				le->recall_index++;
+			}
 		}
 		if (c == 'B') {
 			/* Move cursor down (next history entry). */
-			/* TODO: */
+			char *hist_command;
+			if (lineedit_history_recall(le, &hist_command, le->recall_index - 1) == LINEEDIT_HISTORY_RECALL_OK) {
+				lineedit_set_line(le, hist_command);
+				lineedit_refresh(le);
+				le->recall_index--;
+			}
+
 		}
 		if (c == 'C') {
 			/* move cursor right */
@@ -448,6 +512,7 @@ int32_t lineedit_set_line(struct lineedit *le, const char *text) {
 
 	strncpy(le->text, text, le->len);
 	le->text[le->len - 1] = 0;
+	le->cursor = strlen(le->text);
 
 	return LINEEDIT_SET_LINE_OK;
 }
