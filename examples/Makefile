@@ -1,4 +1,4 @@
-CFLAGS=-I . -I .. -O0 --std=c99  $(CDEBUGFLAGS)
+CFLAGS=-I . -I .. -O0 --std=gnu99  $(CDEBUGFLAGS)
 LDFLAGS=-O0  $(CDEBUGFLAGS)
 CC=gcc
 LD=gcc

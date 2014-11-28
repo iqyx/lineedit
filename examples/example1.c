@@ -47,29 +47,38 @@ int main(int argc, char *argv[]) {
 	/* Set the command prompt. It will be used in the prompt callback function */
 	prompt = "prompt > ";
 
-	/* Start editation with refreshing current line. Needed to display
-	 * command prompt and properly manage cursor positions. It can be used
-	 * anytime later also. */
-	lineedit_refresh(&line);
+	/* Repeat line editation until "quit" is entered. */
+	while (1) {
+		lineedit_clear(&line);
 
-	/* Continuously read characters from console input and pass them to
-	 * lineedit keypress function. All editing processing is done inside
-	 * this single function. Check its return value to see if we are
-	 * finished with editing. */
-	while (!feof(stdin)) {
-		int c = fgetc(stdin);
+		/* Start editation with refreshing current line. Needed to display
+		 * command prompt and properly manage cursor positions. It can be used
+		 * anytime later also. */
+		lineedit_refresh(&line);
 
-		int32_t ret = lineedit_keypress(&line, c);
+		/* Continuously read characters from console input and pass them to
+		 * lineedit keypress function. All editing processing is done inside
+		 * this single function. Check its return value to see if we are
+		 * finished with editing. */
+		while (!feof(stdin)) {
+			int c = fgetc(stdin);
 
-		if (ret == LINEEDIT_ENTER) {
+			int32_t ret = lineedit_keypress(&line, c);
+
+			if (ret == LINEEDIT_ENTER) {
+				break;
+			}
+		}
+
+		/* Get pointer to edited line and print it. */
+		char *text;
+		lineedit_get_line(&line, &text);
+		printf("\nline after editing: '%s'\n", text);
+
+		if (!strcmp(text, "quit")) {
 			break;
 		}
 	}
-
-	/* Get pointer to edited line and print it. */
-	char *text;
-	lineedit_get_line(&line, &text);
-	printf("\nline after editing: '%s'\n", text);
 
 	/* Do not forget to free the whole thing */
 	lineedit_free(&line);
