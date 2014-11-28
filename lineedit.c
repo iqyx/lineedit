@@ -151,6 +151,10 @@ int32_t lineedit_history_append(struct lineedit *le, const char *line) {
 
 
 int32_t lineedit_history_recall(struct lineedit *le, char **line, int32_t recall_index) {
+	if (u_assert(le != NULL) ||
+	    u_assert(line != NULL)) {
+		return LINEEDIT_HISTORY_RECALL_FAILED;
+	}
 
 	if ((recall_index >= (int32_t)le->history_size) || (recall_index < -1)) {
 		return LINEEDIT_HISTORY_RECALL_FAILED;
