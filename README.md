@@ -20,6 +20,7 @@ TODO:
 
 * support for history recall
 * API cleanup
+* get rid of string manipulation functions
 
 
 Library status

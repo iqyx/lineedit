@@ -121,6 +121,19 @@ struct lineedit {
 
 int __attribute__((weak)) u_assert_func(const char *a, const char *f, int n);
 
+/**
+ * @brief Print terminal CSI escape sequence with given parameter.
+ *
+ * This function can be freely used outside the lineedit library to format output
+ * and make it look nicer (eg. colors).
+ *
+ * @param le Lineedit context used to print the output.
+ * @param esc CSI terminal escape sequence to output.
+ * @param param Parameter for the escape sequence.
+ *
+ * @return LINEEDIT_ESCAPE_PRINT_OK on success or
+ *         LINEEDIT_ESCAPE_PRINT_FAILED otherwise.
+ */
 int32_t lineedit_escape_print(struct lineedit *le, enum lineedit_escape_seq esc, int param);
 #define LINEEDIT_ESCAPE_PRINT_OK 0
 #define LINEEDIT_ESCAPE_PRINT_FAILED -1
