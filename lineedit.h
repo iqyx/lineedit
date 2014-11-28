@@ -32,7 +32,7 @@
  * modified according to custom needs.
  */
 #ifndef u_assert
-#define u_assert(e) ((e) ? (0) : (printf("Assertion '%s' failed in %s, line %d\n", #e, __FILE__, __LINE__), abort(), 1))
+#define u_assert(e) ((e) ? (0) : (u_assert_func(#e, __FILE__, __LINE__)))
 #endif
 
 
@@ -119,6 +119,8 @@ struct lineedit {
 	uint32_t prompt_len;
 };
 
+
+int __attribute__((weak)) u_assert_func(const char *a, const char *f, int n);
 
 int32_t lineedit_escape_print(struct lineedit *le, enum lineedit_escape_seq esc, int param);
 #define LINEEDIT_ESCAPE_PRINT_OK 0

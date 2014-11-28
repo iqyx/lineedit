@@ -33,6 +33,13 @@
 #include "lineedit.h"
 
 
+int u_assert_func(const char *a, const char *f, int n) {
+	printf("Assertion '%s' failed in %s, line %d\n", a, f, n);
+	abort();
+	return 1;
+}
+
+
 int32_t lineedit_escape_print(struct lineedit *le, enum lineedit_escape_seq esc, int param) {
 	if (u_assert(le != NULL) ||
 	    u_assert(le->print_handler != NULL)) {
