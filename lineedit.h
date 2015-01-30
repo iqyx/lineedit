@@ -26,19 +26,9 @@
 #ifndef _LINEEDIT_H_
 #define _LINEEDIT_H_
 
-/**
- * Custom assert definition. In an embedded environment, it can be made void or
- * modified according to custom needs.
- */
-#ifndef u_assert
-#define u_assert(e) ((e) ? (0) : (u_assert_func(#e, __FILE__, __LINE__)))
-#endif
-
-
 #ifndef LINEEDIT_HISTORY_LEN
 #define LINEEDIT_HISTORY_LEN 5
 #endif
-
 
 /**
  * Foreground color parameter definitions used as arguments to
@@ -132,8 +122,6 @@ struct lineedit {
 	int32_t recall_index;
 };
 
-
-int __attribute__((weak)) u_assert_func(const char *a, const char *f, int n);
 
 /**
  * @brief Print terminal CSI escape sequence with given parameter.
