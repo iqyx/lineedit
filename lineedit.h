@@ -30,35 +30,22 @@
 #define LINEEDIT_HISTORY_LEN 5
 #endif
 
-/**
- * Foreground color parameter definitions used as arguments to
- * @a lineedit_escape_print function.
- */
-#define LINEEDIT_FG_COLOR_BLACK 30
-#define LINEEDIT_FG_COLOR_RED 31
-#define LINEEDIT_FG_COLOR_GREEN 32
-#define LINEEDIT_FG_COLOR_YELLOW 33
-#define LINEEDIT_FG_COLOR_BLUE 34
-#define LINEEDIT_FG_COLOR_MAGENTA 35
-#define LINEEDIT_FG_COLOR_CYAN 36
-#define LINEEDIT_FG_COLOR_WHITE 37
 
-
-/**
- * Output escape sequence passed as an argument to @a lineedit_escape_print
- * function.
- */
-enum lineedit_escape_seq {
-	ESC_CURSOR_LEFT,
-	ESC_CURSOR_RIGHT,
-	ESC_COLOR,
-	ESC_DEFAULT,
-	ESC_BOLD,
-	ESC_CURSOR_SAVE,
-	ESC_CURSOR_RESTORE,
-	ESC_ERASE_LINE_END
-};
-
+#define ESC_CURSOR_LEFT "\x1b[D"
+#define ESC_CURSOR_RIGHT "\x1b[C"
+#define ESC_DEFAULT "\x1b[0m"
+#define ESC_BOLD "\x1b[1m"
+#define ESC_CURSOR_SAVE "\x1b[s"
+#define ESC_CURSOR_RESTORE "\x1b[u"
+#define ESC_ERASE_LINE_END "\x1b[K"
+#define ESC_COLOR_FG_BLACK "\x1b[30m"
+#define ESC_COLOR_FG_RED "\x1b[31m"
+#define ESC_COLOR_FG_GREEN "\x1b[32m"
+#define ESC_COLOR_FG_YELLOW "\x1b[33m"
+#define ESC_COLOR_FG_BLUE "\x1b[34m"
+#define ESC_COLOR_FG_MAGENTA "\x1b[35m"
+#define ESC_COLOR_FG_CYAN "\x1b[36m"
+#define ESC_COLOR_FG_WHITE "\x1b[37m"
 
 enum lineedit_escape {
 	ESC_NONE, ESC_ESC, ESC_CSI, ESC_OSC
@@ -123,22 +110,9 @@ struct lineedit {
 };
 
 
-/**
- * @brief Print terminal CSI escape sequence with given parameter.
- *
- * This function can be freely used outside the lineedit library to format output
- * and make it look nicer (eg. colors).
- *
- * @param le Lineedit context used to print the output.
- * @param esc CSI terminal escape sequence to output.
- * @param param Parameter for the escape sequence.
- *
- * @return LINEEDIT_ESCAPE_PRINT_OK on success or
- *         LINEEDIT_ESCAPE_PRINT_FAILED otherwise.
- */
-int32_t lineedit_escape_print(struct lineedit *le, enum lineedit_escape_seq esc, int param);
-#define LINEEDIT_ESCAPE_PRINT_OK 0
-#define LINEEDIT_ESCAPE_PRINT_FAILED -1
+int32_t lineedit_print(struct lineedit *le, const char *s);
+#define LINEEDIT_PRINT_OK 0
+#define LINEEDIT_PRINT_FAILED -1
 
 int32_t lineedit_init(struct lineedit *le, uint32_t line_len);
 #define LINEEDIT_INIT_OK 0

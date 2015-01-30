@@ -34,44 +34,15 @@
 #include "lineedit.h"
 
 
-int32_t lineedit_escape_print(struct lineedit *le, enum lineedit_escape_seq esc, int param) {
+int32_t lineedit_print(struct lineedit *le, const char *s) {
 	if (u_assert(le != NULL) ||
 	    u_assert(le->print_handler != NULL)) {
-		return LINEEDIT_ESCAPE_PRINT_FAILED;
+		return LINEEDIT_PRINT_FAILED;
 	}
 
-	char s[20];
-	switch (esc) {
-		case ESC_CURSOR_LEFT:
-			le->print_handler("\x1b[D", le->print_handler_ctx);
-			break;
-		case ESC_CURSOR_RIGHT:
-			le->print_handler("\x1b[C", le->print_handler_ctx);
-			break;
-		case ESC_COLOR:
-			snprintf(s, sizeof(s), "\x1b[%dm", param);
-			le->print_handler(s, le->print_handler_ctx);
-			break;
-		case ESC_DEFAULT:
-			le->print_handler("\x1b[0m", le->print_handler_ctx);
-			break;
-		case ESC_BOLD:
-			le->print_handler("\x1b[1m", le->print_handler_ctx);
-			break;
-		case ESC_CURSOR_SAVE:
-			le->print_handler("\x1b[s", le->print_handler_ctx);
-			break;
-		case ESC_CURSOR_RESTORE:
-			le->print_handler("\x1b[u", le->print_handler_ctx);
-			break;
-		case ESC_ERASE_LINE_END:
-			le->print_handler("\x1b[K", le->print_handler_ctx);
-			break;
-		default:
-			return LINEEDIT_ESCAPE_PRINT_FAILED;
-	}
+	le->print_handler(s, le->print_handler_ctx);
 
-	return LINEEDIT_ESCAPE_PRINT_OK;
+	return LINEEDIT_PRINT_OK;
 }
 
 
@@ -252,14 +223,14 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 			/* move cursor right */
 			if (le->cursor < (strlen(le->text))) {
 				le->cursor++;
-				lineedit_escape_print(le, ESC_CURSOR_RIGHT, 1);
+				lineedit_print(le, ESC_CURSOR_RIGHT);
 			}
 		}
 		if (c == 'D') {
 			/* move cursor left */
 			if (le->cursor > 0) {
 				le->cursor--;
-				lineedit_escape_print(le, ESC_CURSOR_LEFT, 1);
+				lineedit_print(le, ESC_CURSOR_LEFT);
 			}
 		}
 		if (c == '~') {
@@ -297,7 +268,7 @@ int32_t lineedit_backspace(struct lineedit *le) {
 
 	/* move cursor left */
 	le->cursor--;
-	lineedit_escape_print(le, ESC_CURSOR_LEFT, 1);
+	lineedit_print(le, ESC_CURSOR_LEFT);
 
 	/* shift line left */
 	int32_t i = le->cursor;
@@ -307,21 +278,21 @@ int32_t lineedit_backspace(struct lineedit *le) {
 	}
 
 	/* save cursor position */
-	lineedit_escape_print(le, ESC_CURSOR_SAVE, 0);
+	lineedit_print(le, ESC_CURSOR_SAVE);
 
 	/* now we need to refresh rest of the line */
 	i = le->cursor;
 	while (le->text[i]) {
 		char line[2] = {le->text[i], '\0'};
-		le->print_handler(line, le->print_handler_ctx);
+		lineedit_print(le, line);
 		i++;
 	}
 
 	/* erase everything to the end of current line */
-	lineedit_escape_print(le, ESC_ERASE_LINE_END, 0);
+	lineedit_print(le, ESC_ERASE_LINE_END);
 
 	/* restore cursor position */
-	lineedit_escape_print(le, ESC_CURSOR_RESTORE, 0);
+	lineedit_print(le, ESC_CURSOR_RESTORE);
 
 	return LINEEDIT_BACKSPACE_OK;
 }
@@ -356,21 +327,21 @@ int32_t lineedit_insert_char(struct lineedit *le, int c) {
 
 	/* print character at cursor position */
 	char line[2] = {(le->pwchar != 0) ? le->pwchar : c, '\0'};
-	le->print_handler(line, le->print_handler_ctx);
+	lineedit_print(le, line);
 
 	/* save cursor position */
-	lineedit_escape_print(le, ESC_CURSOR_SAVE, 0);
+	lineedit_print(le, ESC_CURSOR_SAVE);
 
 	/* now we need to refresh rest of the line */
 	i = le->cursor;
 	while (le->text[i]) {
 		char s[2] = {(le->pwchar != 0) ? le->pwchar : le->text[i], '\0'};
-		le->print_handler(s, le->print_handler_ctx);
+		lineedit_print(le, s);
 		i++;
 	}
 
 	/* restore cursor position */
-	lineedit_escape_print(le, ESC_CURSOR_RESTORE, 0);
+	lineedit_print(le, ESC_CURSOR_RESTORE);
 
 	return LINEEDIT_INSERT_CHAR_OK;
 }
@@ -403,18 +374,17 @@ int32_t lineedit_set_prompt_callback(struct lineedit *le, int32_t (*prompt_callb
 
 
 int32_t lineedit_refresh(struct lineedit *le) {
-	if (u_assert(le != NULL) ||
-	    u_assert(le->print_handler != NULL)) {
+	if (u_assert(le != NULL)) {
 		return LINEEDIT_REFRESH_FAILED;
 	}
 
 	uint32_t saved = 0;
 
 	/* move cursor to start */
-	le->print_handler("\r", le->print_handler_ctx);
+	lineedit_print(le, "\r");
 
 	/* erase whole line */
-	lineedit_escape_print(le, ESC_ERASE_LINE_END, 0);
+	lineedit_print(le, ESC_ERASE_LINE_END);
 
 	if (le->prompt_callback != NULL) {
 		int32_t len = le->prompt_callback(le, le->prompt_callback_ctx);
@@ -430,19 +400,19 @@ int32_t lineedit_refresh(struct lineedit *le) {
 	while (le->text[i] != '\0') {
 		if (le->cursor == i) {
 			/* save cursor position */
-			lineedit_escape_print(le, ESC_CURSOR_SAVE, 0);
+			lineedit_print(le, ESC_CURSOR_SAVE);
 			saved = 1;
 		}
 
 		char line[2] = {le->text[i], '\0'};
-		le->print_handler(line, le->print_handler_ctx);
+		lineedit_print(le, line);
 
 		i++;
 	}
 
 	/* restore cursor position if needed */
 	if (saved) {
-		lineedit_escape_print(le, ESC_CURSOR_RESTORE, 0);
+		lineedit_print(le, ESC_CURSOR_RESTORE);
 	}
 
 	return LINEEDIT_REFRESH_OK;
@@ -474,11 +444,11 @@ int32_t lineedit_set_cursor(struct lineedit *le, uint32_t cursor) {
 	le->cursor = cursor;
 
 	/* move cursor to start */
-	le->print_handler("\r", le->print_handler_ctx);
+	lineedit_print(le, "\r");
 
 	/* Move cursor to the right up to requested cursor position. */
 	for (uint32_t i = 0; i < le->cursor; i++) {
-		lineedit_escape_print(le, ESC_CURSOR_RIGHT, 0);
+		lineedit_print(le, ESC_CURSOR_RIGHT);
 	}
 
 	return LINEEDIT_SET_CURSOR_OK;
