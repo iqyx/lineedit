@@ -136,119 +136,143 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 		return LINEEDIT_FAILED;
 	}
 
-	/* check for TAB */
-	if (c == 0x09) {
-		return LINEEDIT_TAB;
-	}
+	if (le->escape == ESC_NONE) {
 
-	/* check for line feed */
-	if (c == 0x0a || c == 0x0b || c == 0x0c || c == 0x0d) {
-		/* save current line to history */
-		lineedit_history_append(le, le->text);
+		switch (c) {
+			/* check for TAB */
+			case 0x09:
+				return LINEEDIT_TAB;
 
-		/* And reset recall index to point to current line (-1) */
-		le->recall_index = -1;
+			/* check for line feed */
+			case 0x0a:
+			case 0x0b:
+			case 0x0c:
+			case 0x0d:
+				/* save current line to history */
+				lineedit_history_append(le, le->text);
 
-		return LINEEDIT_ENTER;
-	}
+				/* And reset recall index to point to current line (-1) */
+				le->recall_index = -1;
 
-	/* interrupt escape sequence */
-	if (c == 0x18 || c == 0x1a) {
+				return LINEEDIT_ENTER;
+
+			/* interrupt escape sequence */
+			case 0x18:
+			case 0x1a:
+				le->escape = ESC_NONE;
+				break;
+
+			/* check for ESC */
+			case 0x1b:
+				le->escape = ESC_ESC;
+				break;
+
+			/* check for DEL (backspace) */
+			case 0x7f:
+				/* Do not check return value, if we are unable to do backspace,
+				 * we just ignore it. */
+				lineedit_backspace(le);
+				break;
+
+			/* check for CSI */
+			case 0x9b:
+				le->escape = ESC_CSI;
+				le->csi_escape_mod = 0;
+				break;
+
+			default:
+				/* other alphanumeric characters */
+				if (c >= 32 && c <= 126) {
+					/* Do not check return value, if we are unable to insert it,
+					 * we just ignore the character. */
+					lineedit_insert_char(le, c);
+				}
+				break;
+		}
+
+	} else if (le->escape == ESC_ESC) {
+
+		/* if ESC is set and '[' character was received, start CSI sequence */
+		if (c == '[') {
+			le->escape = ESC_CSI;
+			le->csi_escape_mod = 0;
+		}
+
+		/* if ESC is set and ']' character was received, start OSC sequence */
+		if (c == ']') {
+			le->escape = ESC_OSC;
+		}
+
+	} else if (le->escape == ESC_CSI) {
+
+		/* if CSI is set, try to read first alphanumeric character (parameters are ignored */
+		switch (c) {
+			/* Escape modifier, we continue with CSI escape flag set. */
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+				le->csi_escape_mod = le->csi_escape_mod * 10 + (c - '0');
+				break;
+
+			case 'A': {
+				/* Move cursor up (previous history entry). */
+				char *hist_command;
+				if (lineedit_history_recall(le, &hist_command, le->recall_index + 1) == LINEEDIT_HISTORY_RECALL_OK) {
+					lineedit_set_line(le, hist_command);
+					lineedit_refresh(le);
+					le->recall_index++;
+				}
+				break;
+			}
+
+			case 'B': {
+				/* Move cursor down (next history entry). */
+				char *hist_command;
+				if (lineedit_history_recall(le, &hist_command, le->recall_index - 1) == LINEEDIT_HISTORY_RECALL_OK) {
+					lineedit_set_line(le, hist_command);
+					lineedit_refresh(le);
+					le->recall_index--;
+				}
+				break;
+			}
+
+			case 'C':
+				/* move cursor right */
+				if (le->cursor < (strlen(le->text))) {
+					le->cursor++;
+					lineedit_print(le, ESC_CURSOR_RIGHT);
+				}
+				break;
+
+			case 'D':
+				/* move cursor left */
+				if (le->cursor > 0) {
+					le->cursor--;
+					lineedit_print(le, ESC_CURSOR_LEFT);
+				}
+				break;
+
+			case '~':
+				/* Delete key. */
+				lineedit_backspace(le);
+				break;
+
+			default:
+				break;
+
+		}
+
 		le->escape = ESC_NONE;
-		return LINEEDIT_OK;
-	}
 
-	/* check for ESC */
-	if (c == 0x1b) {
-		le->escape = ESC_ESC;
-		return LINEEDIT_OK;
-	}
-
-	/* check for DEL (backspace) */
-	if (c == 0x7f) {
-		/* Do not check return value, if we are unable to do backspace,
-		 * we just ignore it. */
-		lineedit_backspace(le);
-		return LINEEDIT_OK;
-	}
-
-	/* check for CSI */
-	if (c == 0x9b) {
-		le->escape = ESC_CSI;
-		le->csi_escape_mod = 0;
-		return LINEEDIT_OK;
-	}
-
-	/* if ESC is set and '[' character was received, start CSI sequence */
-	if (le->escape == ESC_ESC && c == '[') {
-		le->escape = ESC_CSI;
-		le->csi_escape_mod = 0;
-		return LINEEDIT_OK;
-	}
-
-	/* if ESC is set and ']' character was received, start OSC sequence */
-	if (le->escape == ESC_ESC && c == ']') {
-		le->escape = ESC_OSC;
-		return LINEEDIT_OK;
-	}
-
-	/* if CSI is set, try to read first alphanumeric character (parameters are ignored */
-	if (le->escape == ESC_CSI) {
-		/* Escape modifier, we continue with CSI escape flag set. */
-		if (c >= '0' && c <= '9') {
-			le->csi_escape_mod = le->csi_escape_mod * 10 + (c - '0');
-			return LINEEDIT_OK;
-		}
-
-		if (c == 'A') {
-			/* Move cursor up (previous history entry). */
-			char *hist_command;
-			if (lineedit_history_recall(le, &hist_command, le->recall_index + 1) == LINEEDIT_HISTORY_RECALL_OK) {
-				lineedit_set_line(le, hist_command);
-				lineedit_refresh(le);
-				le->recall_index++;
-			}
-		}
-		if (c == 'B') {
-			/* Move cursor down (next history entry). */
-			char *hist_command;
-			if (lineedit_history_recall(le, &hist_command, le->recall_index - 1) == LINEEDIT_HISTORY_RECALL_OK) {
-				lineedit_set_line(le, hist_command);
-				lineedit_refresh(le);
-				le->recall_index--;
-			}
-
-		}
-		if (c == 'C') {
-			/* move cursor right */
-			if (le->cursor < (strlen(le->text))) {
-				le->cursor++;
-				lineedit_print(le, ESC_CURSOR_RIGHT);
-			}
-		}
-		if (c == 'D') {
-			/* move cursor left */
-			if (le->cursor > 0) {
-				le->cursor--;
-				lineedit_print(le, ESC_CURSOR_LEFT);
-			}
-		}
-		if (c == '~') {
-			/* Delete key. */
-			lineedit_backspace(le);
-		}
+	} else if (le->escape == ESC_OSC) {
 
 		le->escape = ESC_NONE;
-		return LINEEDIT_OK;
-	}
-
-
-	/* other alphanumeric characters */
-	if (c >= 32 && c <= 127) {
-		/* Do not check return value, if we are unable to insert it,
-		 * we just ignore the character. */
-		lineedit_insert_char(le, c);
-		return LINEEDIT_OK;
 	}
 
 	return LINEEDIT_OK;
