@@ -35,8 +35,7 @@
 
 
 int32_t lineedit_print(struct lineedit *le, const char *s) {
-	if (u_assert(le != NULL) ||
-	    u_assert(le->print_handler != NULL)) {
+	if (u_assert(le != NULL && le->print_handler != NULL)) {
 		return LINEEDIT_PRINT_FAILED;
 	}
 
@@ -47,46 +46,39 @@ int32_t lineedit_print(struct lineedit *le, const char *s) {
 
 
 int32_t lineedit_init(struct lineedit *le, uint32_t line_len) {
-	if (u_assert(le != NULL) ||
-	    u_assert(line_len > 0)) {
+	if (u_assert(le != NULL && line_len > 0)) {
 		return LINEEDIT_INIT_FAILED;
 	}
 
+	/* Zero the whole structure. */
+	memset(le, 0, sizeof(struct lineedit));
 	le->len = line_len;
 	le->history_size = LINEEDIT_HISTORY_LEN;
-
-	le->text = malloc(le->len);
-	if (le->text == NULL) {
-		return LINEEDIT_INIT_FAILED;
-	}
-
-	le->history = malloc(le->len * le->history_size);
-	if (le->history == NULL) {
-		return LINEEDIT_INIT_FAILED;
-	}
-
-	/* Initialize history with empty strings */
-	for (uint32_t i = 0; i < le->history_size; i++) {
-		strcpy(le->history + (i * le->len), "");
-	}
-
-	le->cursor = 0;
-	le->text[0] = 0;
-	le->pwchar = '\0';
-	le->prompt_len = 0;
-	le->csi_escape_mod = 0;
-	le->print_handler = NULL;
-	le->print_handler_ctx = NULL;
-	le->prompt_callback = NULL;
+	le->escape = ESC_NONE;
 	le->recall_index = -1;
+
+	/* Allocate line editing buffer and its corresponding history buffers.
+	 * If one of the allocation fails, free any allocated resources and return
+	 * with error. */
+	le->text = malloc(le->len);
+	le->history = malloc(le->len * le->history_size);
+	if (le->text == NULL || le->history == NULL) {
+		lineedit_free(le);
+		return LINEEDIT_INIT_FAILED;
+	}
+
+	/* History is saved in an array of strings le->len long. Initialize the
+	 * history by writing 0 at first position of every history entry. */
+	for (uint32_t i = 0; i < le->history_size; i++) {
+		le->history[i * le->len] = '\0';
+	}
 
 	return LINEEDIT_INIT_OK;
 }
 
 
 int32_t lineedit_free(struct lineedit *le) {
-	if (u_assert(le != NULL) ||
-	    u_assert(le->text != NULL)) {
+	if (u_assert(le != NULL)) {
 		return LINEEDIT_FREE_FAILED;
 	}
 
@@ -98,24 +90,24 @@ int32_t lineedit_free(struct lineedit *le) {
 
 
 int32_t lineedit_history_append(struct lineedit *le, const char *line) {
-	if (u_assert(le != NULL) ||
-	    u_assert(line != NULL)) {
-		return LINEEDIT_HISTORY_APPEND_OK;
+	if (u_assert(le != NULL && line != NULL)) {
+		return LINEEDIT_HISTORY_APPEND_FAILED;
 	}
 
 	/* Shift all history entries first. The newest one has index 0. */
 	for (uint32_t i = le->history_size - 1; i > 0 ; i--) {
-		strncpy(le->history + (i * le->len), le->history + ((i - 1) * le->len), le->len);
-		le->history[i * le->len + le->len - 1] = '\0';
+		strlcpy(le->history + (i * le->len), le->history + ((i - 1) * le->len), le->len);
 	}
-	strncpy(le->history, line, le->len);
-	le->history[le->len - 1] = '\0';
+	strlcpy(le->history, line, le->len);
 
 	return LINEEDIT_HISTORY_APPEND_OK;
 }
 
 
 int32_t lineedit_history_recall(struct lineedit *le, char **line, int32_t recall_index) {
+	if (u_assert(le != NULL && line != NULL)) {
+		return LINEEDIT_HISTORY_RECALL_FAILED;
+	}
 
 	if ((recall_index >= (int32_t)le->history_size) || (recall_index < -1)) {
 		return LINEEDIT_HISTORY_RECALL_FAILED;
@@ -131,8 +123,7 @@ int32_t lineedit_history_recall(struct lineedit *le, char **line, int32_t recall
 
 
 int32_t lineedit_keypress(struct lineedit *le, int c) {
-	if (u_assert(le != NULL) ||
-	    u_assert(le->print_handler != NULL)) {
+	if (u_assert(le != NULL)) {
 		return LINEEDIT_FAILED;
 	}
 
@@ -148,12 +139,10 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 			case 0x0b:
 			case 0x0c:
 			case 0x0d:
-				/* save current line to history */
+				/* save current line to the history and reset recall
+				 * index to point to the current line (-1) */
 				lineedit_history_append(le, le->text);
-
-				/* And reset recall index to point to current line (-1) */
 				le->recall_index = -1;
-
 				return LINEEDIT_ENTER;
 
 			/* interrupt escape sequence */
@@ -312,11 +301,9 @@ int32_t lineedit_backspace(struct lineedit *le) {
 		i++;
 	}
 
-	/* erase everything to the end of current line */
-	lineedit_print(le, ESC_ERASE_LINE_END);
-
-	/* restore cursor position */
-	lineedit_print(le, ESC_CURSOR_RESTORE);
+	/* erase everything to the end of the current line  and restore
+	 * the cursor position. */
+	lineedit_print(le, ESC_ERASE_LINE_END ESC_CURSOR_RESTORE);
 
 	return LINEEDIT_BACKSPACE_OK;
 }
@@ -328,7 +315,7 @@ int32_t lineedit_insert_char(struct lineedit *le, int c) {
 	}
 
 	/* Only printable characters can be inserted. */
-	if (c < 32 || c > 127) {
+	if (c < 32 || c > 126) {
 		return LINEEDIT_INSERT_CHAR_FAILED;
 	}
 
@@ -343,28 +330,22 @@ int32_t lineedit_insert_char(struct lineedit *le, int c) {
 		i--;
 	}
 
-	/* set character at cursor */
+	/* set character at cursor and increment the cursor position */
 	le->text[le->cursor] = c;
-
-	/* and increment cursor */
 	le->cursor++;
 
 	/* print character at cursor position */
 	char line[2] = {(le->pwchar != 0) ? le->pwchar : c, '\0'};
 	lineedit_print(le, line);
 
-	/* save cursor position */
+	/* now we need to refresh the rest of the line */
 	lineedit_print(le, ESC_CURSOR_SAVE);
-
-	/* now we need to refresh rest of the line */
 	i = le->cursor;
 	while (le->text[i]) {
 		char s[2] = {(le->pwchar != 0) ? le->pwchar : le->text[i], '\0'};
 		lineedit_print(le, s);
 		i++;
 	}
-
-	/* restore cursor position */
 	lineedit_print(le, ESC_CURSOR_RESTORE);
 
 	return LINEEDIT_INSERT_CHAR_OK;
@@ -372,8 +353,7 @@ int32_t lineedit_insert_char(struct lineedit *le, int c) {
 
 
 int32_t lineedit_set_print_handler(struct lineedit *le, int32_t (*print_handler)(const char *line, void *ctx), void *ctx) {
-	if (u_assert(le != NULL) ||
-	    u_assert(print_handler != NULL)) {
+	if (u_assert(le != NULL && print_handler != NULL)) {
 		return LINEEDIT_SET_PRINT_HANDLER_FAILED;
 	}
 
@@ -385,8 +365,7 @@ int32_t lineedit_set_print_handler(struct lineedit *le, int32_t (*print_handler)
 
 
 int32_t lineedit_set_prompt_callback(struct lineedit *le, int32_t (*prompt_callback)(struct lineedit *le, void *ctx), void *ctx) {
-	if (u_assert(le != NULL) ||
-	    u_assert(prompt_callback != NULL)) {
+	if (u_assert(le != NULL && prompt_callback != NULL)) {
 		return LINEEDIT_SET_PROMPT_CALLBACK_FAILED;
 	}
 
@@ -404,12 +383,10 @@ int32_t lineedit_refresh(struct lineedit *le) {
 
 	uint32_t saved = 0;
 
-	/* move cursor to start */
-	lineedit_print(le, "\r");
+	/* move cursor to start and erase the whole line */
+	lineedit_print(le, "\r" ESC_ERASE_LINE_END);
 
-	/* erase whole line */
-	lineedit_print(le, ESC_ERASE_LINE_END);
-
+	/* Print the command prompt on the beginning */
 	if (le->prompt_callback != NULL) {
 		int32_t len = le->prompt_callback(le, le->prompt_callback_ctx);
 		if (len < 0) {
@@ -428,8 +405,8 @@ int32_t lineedit_refresh(struct lineedit *le) {
 			saved = 1;
 		}
 
-		char line[2] = {le->text[i], '\0'};
-		lineedit_print(le, line);
+		char s[2] = {(le->pwchar != 0) ? le->pwchar : le->text[i], '\0'};
+		lineedit_print(le, s);
 
 		i++;
 	}
@@ -444,8 +421,7 @@ int32_t lineedit_refresh(struct lineedit *le) {
 
 
 int32_t lineedit_get_cursor(struct lineedit *le, uint32_t *cursor) {
-	if (u_assert(le != NULL) ||
-	    u_assert(cursor != NULL)) {
+	if (u_assert(le != NULL && cursor != NULL)) {
 		return LINEEDIT_GET_CURSOR_FAILED;
 	}
 
@@ -455,7 +431,7 @@ int32_t lineedit_get_cursor(struct lineedit *le, uint32_t *cursor) {
 }
 
 
-/* TODO: can be implemented more effectively. */
+/* TODO: can be implemented more efficiently. */
 int32_t lineedit_set_cursor(struct lineedit *le, uint32_t cursor) {
 	if (u_assert(le != NULL)) {
 		return LINEEDIT_SET_CURSOR_FAILED;
@@ -467,22 +443,19 @@ int32_t lineedit_set_cursor(struct lineedit *le, uint32_t cursor) {
 
 	le->cursor = cursor;
 
-	/* move cursor to start */
+	/* move cursor to the beginning and then  to the right up to requested
+	 * cursor position. */
 	lineedit_print(le, "\r");
-
-	/* Move cursor to the right up to requested cursor position. */
 	for (uint32_t i = 0; i < le->cursor; i++) {
 		lineedit_print(le, ESC_CURSOR_RIGHT);
 	}
 
 	return LINEEDIT_SET_CURSOR_OK;
-
 }
 
 
 int32_t lineedit_get_line(struct lineedit *le, char **text) {
-	if (u_assert(le != NULL) ||
-	    u_assert(text != NULL)) {
+	if (u_assert(le != NULL && text != NULL)) {
 		return LINEEDIT_GET_LINE_FAILED;
 	}
 
@@ -493,13 +466,11 @@ int32_t lineedit_get_line(struct lineedit *le, char **text) {
 
 
 int32_t lineedit_set_line(struct lineedit *le, const char *text) {
-	if (u_assert(le != NULL) ||
-	    u_assert(text != NULL)) {
+	if (u_assert(le != NULL && text != NULL)) {
 		return LINEEDIT_SET_LINE_FAILED;
 	}
 
-	strncpy(le->text, text, le->len);
-	le->text[le->len - 1] = 0;
+	strlcpy(le->text, text, le->len);
 	le->cursor = strlen(le->text);
 
 	return LINEEDIT_SET_LINE_OK;
@@ -519,8 +490,7 @@ int32_t lineedit_clear(struct lineedit *le) {
 
 
 int32_t lineedit_insert(struct lineedit *le, const char *text) {
-	if (u_assert(le != NULL) ||
-	    u_assert(text != NULL)) {
+	if (u_assert(le != NULL && text != NULL)) {
 		return LINEEDIT_INSERT_FAILED;
 	}
 
