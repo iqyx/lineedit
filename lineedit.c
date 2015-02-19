@@ -60,8 +60,8 @@ int32_t lineedit_init(struct lineedit *le, uint32_t line_len) {
 	/* Allocate line editing buffer and its corresponding history buffers.
 	 * If one of the allocation fails, free any allocated resources and return
 	 * with error. */
-	le->text = malloc(le->len);
-	le->history = malloc(le->len * le->history_size);
+	le->text = calloc(1, le->len);
+	le->history = calloc(1, le->len * le->history_size);
 	if (le->text == NULL || le->history == NULL) {
 		lineedit_free(le);
 		return LINEEDIT_INIT_FAILED;
