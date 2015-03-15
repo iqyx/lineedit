@@ -31,8 +31,10 @@
 #endif
 
 
-#define ESC_CURSOR_LEFT "\x1b[D"
+#define ESC_CURSOR_UP "\x1b[A"
+#define ESC_CURSOR_DOWN "\x1b[B"
 #define ESC_CURSOR_RIGHT "\x1b[C"
+#define ESC_CURSOR_LEFT "\x1b[D"
 #define ESC_DEFAULT "\x1b[0m"
 #define ESC_BOLD "\x1b[1m"
 #define ESC_CURSOR_SAVE "\x1b[s"
