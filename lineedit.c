@@ -145,6 +145,10 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 				le->recall_index = -1;
 				return LINEEDIT_ENTER;
 
+			case 0x12:
+				lineedit_refresh(le);
+				break;
+
 			/* interrupt escape sequence */
 			case 0x18:
 			case 0x1a:
@@ -194,7 +198,7 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 
 	} else if (le->escape == ESC_CSI) {
 
-		/* if CSI is set, try to read first alphanumeric character (parameters are ignored */
+		/* if CSI is set, try to read first alphanumeric character (parameters are ignored) */
 		switch (c) {
 			/* Escape modifier, we continue with CSI escape flag set. */
 			case '0':
@@ -206,6 +210,7 @@ int32_t lineedit_keypress(struct lineedit *le, int c) {
 			case '6':
 			case '7':
 			case '8':
+			case '9':
 				le->csi_escape_mod = le->csi_escape_mod * 10 + (c - '0');
 				break;
 
